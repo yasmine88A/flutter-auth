@@ -1,6 +1,6 @@
 
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class Registerpage extends StatefulWidget {
   const Registerpage({super.key});
@@ -10,8 +10,6 @@ class Registerpage extends StatefulWidget {
 }
 
 class _RegisterpageState extends State<Registerpage> {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _confirmpasswordController =
       TextEditingController();
@@ -60,7 +58,7 @@ class _RegisterpageState extends State<Registerpage> {
     return null;
   }
 
-  // Inscription avec Firebase
+  // Inscription avec Supabase
   Future<void> signUp() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -71,68 +69,52 @@ class _RegisterpageState extends State<Registerpage> {
     });
 
     try {
-      UserCredential userCredential =
-          await _auth.createUserWithEmailAndPassword(
+      final result = await Supabase.instance.client.auth.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
-      if (userCredential.user != null) {
-        // Revenir au login pour tester la connexion
-        await _auth.signOut();
-
-        if (!mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Registration successful!'),
-          ),
-        );
-
-        Navigator.pushReplacementNamed(context, '/login');
+      if (result.user == null) {
+        throw Exception('Registration failed');
       }
-    } on FirebaseAuthException catch (e) {
+
+      // Déconnexion pour tester ensuite la page Login
+      if (result.session != null) {
+        await Supabase.instance.client.auth.signOut();
+      }
+
       if (!mounted) return;
 
-      String message;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.session == null
+                ? 'Check your email to confirm your account.'
+                : 'Registration successful!',
+          ),
+        ),
+      );
 
-      switch (e.code) {
-        case 'weak-password':
-          message = 'Your password is too weak.';
-          break;
+      Navigator.pushReplacementNamed(context, '/login');
 
-        case 'email-already-in-use':
-          message = 'This email is already registered.';
-          break;
-
-        case 'invalid-email':
-          message = 'Invalid email address.';
-          break;
-
-        case 'operation-not-allowed':
-          message = 'Email/Password authentication is not enabled.';
-          break;
-
-        case 'network-request-failed':
-          message = 'Please check your internet connection.';
-          break;
-
-        default:
-          message = e.message ?? 'Registration failed.';
-      }
+    } on AuthException catch (e) {
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
+        SnackBar(content: Text(e.message)),
       );
+
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('An unexpected error occurred.'),
+          content: Text('Registration failed. Try again.'),
         ),
       );
+
       debugPrint('Registration error: $e');
+
     } finally {
       if (mounted) {
         setState(() {
@@ -271,7 +253,9 @@ class _RegisterpageState extends State<Registerpage> {
                   ),
                 ),
                 child: _isLoading
-                    ? const CircularProgressIndicator()
+                    ? const CircularProgressIndicator(
+                        color: Colors.white,
+                      )
                     : const Text(
                         'Register',
                         style: TextStyle(

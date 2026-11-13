@@ -1,6 +1,6 @@
 
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -12,8 +12,6 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-
-  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   bool _passwordvisible = false;
   bool _isLoading = false;
@@ -47,7 +45,7 @@ class _LoginPageState extends State<LoginPage> {
     return null;
   }
 
-  // Connexion avec Firebase
+  // Connexion avec Supabase
   Future<void> signIn() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -58,58 +56,26 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      UserCredential userCredential =
-          await _auth.signInWithEmailAndPassword(
+      await Supabase.instance.client.auth.signInWithPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
       if (!mounted) return;
 
-      if (userCredential.user != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Login successful!'),
-          ),
-        );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Login successful!'),
+        ),
+      );
 
-        Navigator.pushReplacementNamed(context, '/home');
-      }
+      Navigator.pushReplacementNamed(context, '/home');
 
-    } on FirebaseAuthException catch (e) {
+    } on AuthException catch (e) {
       if (!mounted) return;
 
-      String message;
-
-      switch (e.code) {
-        case 'invalid-email':
-          message = 'Invalid email address.';
-          break;
-
-        case 'user-not-found':
-        case 'wrong-password':
-        case 'invalid-credential':
-          message = 'Incorrect email or password.';
-          break;
-
-        case 'user-disabled':
-          message = 'This account has been disabled.';
-          break;
-
-        case 'too-many-requests':
-          message = 'Too many attempts. Please try again later.';
-          break;
-
-        case 'network-request-failed':
-          message = 'Please check your internet connection.';
-          break;
-
-        default:
-          message = e.message ?? 'Login failed.';
-      }
-
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
+        SnackBar(content: Text(e.message)),
       );
 
     } catch (e) {
